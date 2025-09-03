@@ -494,14 +494,32 @@ def get_accountwise_gle(filters, accounting_dimensions, gl_entries, gle_map):
     group_by = get_group_by_field(filters.get("categorize_by"))
     group_by_voucher_consolidated = filters.get("categorize_by") == "Categorize by Voucher (Consolidated)"
 
-    # Use the root type (Income, Expense, Asset, Liability) for all accounts.
+    # Get a map of account names to their root types ('Income', 'Expense', etc.).
     account_root_type_map = get_account_root_type_map(filters.get("company"))
-    # Check against the fundamental root types for P&L accounts.
-    profit_loss_root_types = {"Income", "Expense","Expenses"}
-	
+    profit_loss_root_types = {"Income", "Expense"}
+
     immutable_ledger = frappe.get_single_value("Accounts Settings", "enable_immutable_ledger")
-    fy_start_date = get_fiscal_year(filters.from_date, company=filters.company)[1]
+    
+    # --- Period Closing Check ---
+    # Determine the previous fiscal year based on the report's date filters.
+    from frappe.utils import add_days
+    current_fy_start_date = get_fiscal_year(filters.from_date, company=filters.company)[1]
+    previous_fy_end_date = add_days(current_fy_start_date, -1)
+    previous_fiscal_year = get_fiscal_year(previous_fy_end_date, company=filters.company)[0]
+
+    # Check if a submitted Period Closing Voucher exists for the previous fiscal year.
+    # This ensures that we only adjust opening balances if the prior year is formally closed.
+    is_previous_year_closed = frappe.db.exists(
+        "Period Closing Voucher",
+        {
+            "company": filters.get("company"),
+            "fiscal_year": previous_fiscal_year,
+            "docstatus": 1,
+        },
+    )
+
     def update_value_in_dict(data, key, gle):
+        """A helper function to aggregate debit/credit values into a dictionary."""
         data[key].debit += gle.debit
         data[key].credit += gle.credit
         data[key].debit_in_account_currency += gle.debit_in_account_currency
@@ -544,15 +562,21 @@ def get_accountwise_gle(filters, accounting_dimensions, gl_entries, gle_map):
         gle.remarks = _(gle.remarks)
         gle.party_type = _(gle.party_type)
 
+        # An entry is considered part of the "Opening" if its date is before the report's start date.
         is_opening_entry = gle.posting_date < from_date or (cstr(gle.is_opening) == "Yes" and not show_opening_entries)
 
-        # Corrected & Robust Logic
-        # 1. Get the root type for the current GL entry's account.
         root_type = account_root_type_map.get(gle.account)
 
-        # 2. Check if it's a P&L account and the entry is from a previous fiscal year.
-        if is_opening_entry and root_type in profit_loss_root_types and gle.posting_date < fy_start_date:
-            continue
+        # It will only apply IF the previous year has been formally closed via a PCV.
+        if (
+            is_previous_year_closed
+            and is_opening_entry
+            and root_type in profit_loss_root_types
+            and gle.posting_date < current_fy_start_date
+        ):
+            # Skip this entry from being added to the opening balance because it's
+            # a P&L entry from a prior, closed fiscal year.
+            continue 
 
         if is_opening_entry:
             if not group_by_voucher_consolidated:
