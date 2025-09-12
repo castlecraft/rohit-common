@@ -221,25 +221,24 @@ def get_gl_entries(filters, accounting_dimensions):
 
 
 def get_conditions(filters):
-	conditions = []
+	# Get the start and end dates of the fiscal year based on the 'from_date' filter
+	fy = get_fiscal_year(filters.from_date, company=filters.company)
+	filters.fy_start_date = fy[1] # fy[1] is the start date
 
+	conditions = []
 	ignore_is_opening = frappe.get_single_value("Accounts Settings", "ignore_is_opening_check_for_reporting")
 
 	if filters.get("account"):
 		filters.account = get_accounts_with_children(filters.account)
 		if filters.account:
 			conditions.append("account in %(account)s")
-
 	if filters.get("cost_center"):
 		filters.cost_center = get_cost_centers_with_children(filters.cost_center)
 		conditions.append("cost_center in %(cost_center)s")
-
 	if filters.get("voucher_no"):
 		conditions.append("voucher_no=%(voucher_no)s")
-
 	if filters.get("against_voucher_no"):
 		conditions.append("against_voucher=%(against_voucher_no)s")
-
 	if filters.get("ignore_err"):
 		err_journals = frappe.db.get_all(
 			"Journal Entry",
@@ -252,7 +251,6 @@ def get_conditions(filters):
 		)
 		if err_journals:
 			filters.update({"voucher_no_not_in": [x[0] for x in err_journals]})
-
 	if filters.get("ignore_cr_dr_notes"):
 		system_generated_cr_dr_journals = frappe.db.get_all(
 			"Journal Entry",
@@ -269,28 +267,20 @@ def get_conditions(filters):
 				x[0] for x in system_generated_cr_dr_journals
 			]
 			filters.update({"voucher_no_not_in": vouchers_to_ignore})
-
 	if filters.get("voucher_no_not_in"):
 		conditions.append("voucher_no not in %(voucher_no_not_in)s")
-
 	if filters.get("categorize_by") == "Categorize by Party" and not filters.get("party_type"):
 		conditions.append("party_type in ('Customer', 'Supplier')")
-
 	if filters.get("party_type"):
 		conditions.append("party_type=%(party_type)s")
-
 	if filters.get("party"):
 		conditions.append("party in %(party)s")
 
-	if not (
-		filters.get("account")
-		or filters.get("party")
-		or filters.get("categorize_by") in ["Categorize by Account", "Categorize by Party"]
-	):
-		if not ignore_is_opening:
-			conditions.append("(posting_date >=%(from_date)s or is_opening = 'Yes')")
-		else:
-			conditions.append("posting_date >=%(from_date)s")
+	# fetch data from the start of the fiscal year to correctly calculate the opening balance.
+	if not ignore_is_opening:
+		conditions.append("(posting_date >= %(fy_start_date)s or is_opening = 'Yes')")
+	else:
+		conditions.append("posting_date >= %(fy_start_date)s")
 
 	if not ignore_is_opening:
 		conditions.append("(posting_date <=%(to_date)s or is_opening = 'Yes')")
@@ -332,7 +322,6 @@ def get_conditions(filters):
 
 	if accounting_dimensions:
 		for dimension in accounting_dimensions:
-			# Ignore 'Finance Book' set up as dimension in below logic, as it is already handled in above section
 			if not dimension.disabled and dimension.document_type != "Finance Book":
 				if filters.get(dimension.fieldname):
 					if frappe.get_cached_value("DocType", dimension.document_type, "is_tree"):
@@ -529,24 +518,24 @@ def get_accountwise_gle(filters, accounting_dimensions, gl_entries, gle_map):
             data[key].debit_in_transaction_currency += gle.debit_in_transaction_currency
             data[key].credit_in_transaction_currency += gle.credit_in_transaction_currency
 
-        if filters.get("show_net_values_in_party_account") and account_root_type_map.get(data[key].account) in (
-            "Receivable",
-            "Payable",
-        ):
-            net_value = data[key].debit - data[key].credit
-            net_value_in_account_currency = (
-                data[key].debit_in_account_currency - data[key].credit_in_account_currency
-            )
-            if net_value < 0:
-                dr_or_cr = "credit"
-                rev_dr_or_cr = "debit"
-            else:
-                dr_or_cr = "debit"
-                rev_dr_or_cr = "credit"
-            data[key][dr_or_cr] = abs(net_value)
-            data[key][dr_or_cr + "_in_account_currency"] = abs(net_value_in_account_currency)
-            data[key][rev_dr_or_cr] = 0
-            data[key][rev_dr_or_cr + "_in_account_currency"] = 0
+        if filters.get("show_net_values_in_party_account"):
+            # determine the account root type from the GLE's account
+            root_type_for_entry = account_root_type_map.get(gle.account)
+            if root_type_for_entry in ("Receivable", "Payable"):
+                net_value = data[key].debit - data[key].credit
+                net_value_in_account_currency = (
+                    data[key].debit_in_account_currency - data[key].credit_in_account_currency
+                )
+                if net_value < 0:
+                    dr_or_cr = "credit"
+                    rev_dr_or_cr = "debit"
+                else:
+                    dr_or_cr = "debit"
+                    rev_dr_or_cr = "credit"
+                data[key][dr_or_cr] = abs(net_value)
+                data[key][dr_or_cr + "_in_account_currency"] = abs(net_value_in_account_currency)
+                data[key][rev_dr_or_cr] = 0
+                data[key][rev_dr_or_cr + "_in_account_currency"] = 0
 
         if data[key].against_voucher and gle.against_voucher:
             data[key].against_voucher += ", " + gle.against_voucher
@@ -630,21 +619,56 @@ def get_account_type_map(company):
 
 
 def get_result_as_list(data, filters):
-	balance = 0
+    balance = 0.0
+    opening_balance = None
 
-	for d in data:
-		if not d.get("posting_date"):
-			balance = 0
+    def contains_label(s, label):
+        return label in (s or "").lower()
 
-		balance = get_balance(d, balance, "debit", "credit")
+    for d in data:
+        acct_text = d.get("account") or ""
+        acct_text_l = acct_text.lower()
 
-		d["balance"] = balance
+        # Opening row
+        if contains_label(acct_text_l, "opening"):
+            opening_balance = d.get("debit", 0.0) - d.get("credit", 0.0)
+            balance = opening_balance
+            d["balance"] = balance
+            continue
 
-		d["account_currency"] = filters.account_currency
+        # Transaction row: has a posting_date
+        if d.get("posting_date"):
+            balance += d.get("debit", 0.0) - d.get("credit", 0.0)
+            d["balance"] = balance
+            continue
 
-		d["presentation_currency"] = filters.presentation_currency
+        # Total row
+        if contains_label(acct_text_l, "total"):
+            if opening_balance is not None:
+                # net change during the period
+                d["balance"] = balance - opening_balance
+            else:
+                # fallback - show debit-credit
+                d["balance"] = d.get("debit", 0.0) - d.get("credit", 0.0)
+            continue
 
-	return data
+        # Closing row
+        if contains_label(acct_text_l, "closing"):
+            d["balance"] = balance
+            balance = 0.0
+            opening_balance = None
+            continue
+
+        if not d.get("posting_date"):
+            balance = 0.0
+            opening_balance = None
+            d["balance"] = None
+
+    for d in data:
+        d["account_currency"] = filters.account_currency
+        d["presentation_currency"] = filters.presentation_currency
+
+    return data
 
 
 def get_supplier_invoice_details():
