@@ -227,6 +227,7 @@ def get_gl_entries(filters, accounting_dimensions):
 
 def get_conditions(filters):
     # Get the start and end dates of the fiscal year based on the 'from_date' filter
+    # This is no longer needed for the date conditions but might be used by other logic.
     fy = get_fiscal_year(filters.from_date, company=filters.company)
     filters.fy_start_date = fy[1]
 
@@ -281,17 +282,23 @@ def get_conditions(filters):
     if filters.get("party"):
         conditions.append("party in %(party)s")
 
-    # Always fetch data from the start of the fiscal year to correctly calculate the opening balance.
-    # The python logic will handle separating the transactions that occurred before the 'from_date'.
-    if not ignore_is_opening:
-        conditions.append("(posting_date >= %(fy_start_date)s or is_opening = 'Yes')")
-    else:
-        conditions.append("posting_date >= %(fy_start_date)s")
+    # --- REMOVED ---
+    # The following block was incorrectly limiting the query to the current fiscal year,
+    # leading to an incorrect opening balance calculation when no Period Closing Voucher exists.
+    # if not ignore_is_opening:
+    # 	conditions.append("(posting_date >= %(fy_start_date)s or is_opening = 'Yes')")
+    # else:
+    # 	conditions.append("posting_date >= %(fy_start_date)s")
 
+    # --- CORRECTED LOGIC ---
+    # The query should fetch all transactions up to the 'to_date'.
+    # The Python code in get_accountwise_gle will correctly separate them
+    # into 'opening' (before from_date) and 'total' (within the date range).
     if not ignore_is_opening:
         conditions.append("(posting_date <=%(to_date)s or is_opening = 'Yes')")
     else:
         conditions.append("posting_date <=%(to_date)s")
+
     if filters.get("project"):
         conditions.append("project in %(project)s")
     if filters.get("include_default_book_entries"):
@@ -554,6 +561,32 @@ def get_accountwise_gle(filters, accounting_dimensions, gl_entries, gle_map):
         if filters.from_date <= getdate(g.posting_date) <= filters.to_date:
             update_value_in_dict(totals, "total", g)
             update_value_in_dict(totals, "closing", g)
+
+    # --- NEW LOGIC ADDED ---
+    # The code above correctly sums up all historical debits and credits for the opening balance.
+    # Now, we net these values to show a clean, single opening balance figure.
+
+    # Netting for company currency
+    opening_balance = totals.opening.debit - totals.opening.credit
+    if opening_balance > 0:
+        totals.opening.debit = opening_balance
+        totals.opening.credit = 0
+    else:
+        totals.opening.credit = abs(opening_balance)
+        totals.opening.debit = 0
+
+    # Netting for account currency
+    opening_balance_in_account_currency = (
+        totals.opening.debit_in_account_currency - totals.opening.credit_in_account_currency
+    )
+    if opening_balance_in_account_currency > 0:
+        totals.opening.debit_in_account_currency = opening_balance_in_account_currency
+        totals.opening.credit_in_account_currency = 0
+    else:
+        totals.opening.credit_in_account_currency = abs(opening_balance_in_account_currency)
+        totals.opening.debit_in_account_currency = 0
+    # --- END OF NEW LOGIC ---
+
 
     return totals, gl_entries
 
