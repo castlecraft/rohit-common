@@ -282,15 +282,6 @@ def get_conditions(filters):
     if filters.get("party"):
         conditions.append("party in %(party)s")
 
-    # --- REMOVED ---
-    # The following block was incorrectly limiting the query to the current fiscal year,
-    # leading to an incorrect opening balance calculation when no Period Closing Voucher exists.
-    # if not ignore_is_opening:
-    # 	conditions.append("(posting_date >= %(fy_start_date)s or is_opening = 'Yes')")
-    # else:
-    # 	conditions.append("posting_date >= %(fy_start_date)s")
-
-    # --- CORRECTED LOGIC ---
     # The query should fetch all transactions up to the 'to_date'.
     # The Python code in get_accountwise_gle will correctly separate them
     # into 'opening' (before from_date) and 'total' (within the date range).
