@@ -562,11 +562,9 @@ def get_accountwise_gle(filters, accounting_dimensions, gl_entries, gle_map):
             update_value_in_dict(totals, "total", g)
             update_value_in_dict(totals, "closing", g)
 
-    # --- NEW LOGIC ADDED ---
-    # The code above correctly sums up all historical debits and credits for the opening balance.
-    # Now, we net these values to show a clean, single opening balance figure.
 
-    # Netting for company currency
+    # --- LOGIC TO NET OFF OPENING AND CLOSING BALANCES ---
+    # Netting for company currency (Opening)
     opening_balance = totals.opening.debit - totals.opening.credit
     if opening_balance > 0:
         totals.opening.debit = opening_balance
@@ -575,7 +573,7 @@ def get_accountwise_gle(filters, accounting_dimensions, gl_entries, gle_map):
         totals.opening.credit = abs(opening_balance)
         totals.opening.debit = 0
 
-    # Netting for account currency
+    # Netting for account currency (Opening)
     opening_balance_in_account_currency = (
         totals.opening.debit_in_account_currency - totals.opening.credit_in_account_currency
     )
@@ -585,8 +583,29 @@ def get_accountwise_gle(filters, accounting_dimensions, gl_entries, gle_map):
     else:
         totals.opening.credit_in_account_currency = abs(opening_balance_in_account_currency)
         totals.opening.debit_in_account_currency = 0
-    # --- END OF NEW LOGIC ---
 
+    # For company currency
+    closing_balance = (totals.opening.debit + totals.total.debit) - (
+        totals.opening.credit + totals.total.credit
+    )
+    if closing_balance > 0:
+        totals.closing.debit = closing_balance
+        totals.closing.credit = 0
+    else:
+        totals.closing.credit = abs(closing_balance)
+        totals.closing.debit = 0
+
+    # For account currency
+    closing_balance_ac = (
+        totals.opening.debit_in_account_currency + totals.total.debit_in_account_currency
+    ) - (totals.opening.credit_in_account_currency + totals.total.credit_in_account_currency)
+
+    if closing_balance_ac > 0:
+        totals.closing.debit_in_account_currency = closing_balance_ac
+        totals.closing.credit_in_account_currency = 0
+    else:
+        totals.closing.credit_in_account_currency = abs(closing_balance_ac)
+        totals.closing.debit_in_account_currency = 0
 
     return totals, gl_entries
 
