@@ -4,10 +4,7 @@
 
 from __future__ import unicode_literals
 import frappe
-import json
 from datetime import datetime
-from frappe.utils.data import getdate
-from ...india_gst_api.gst_public_api import track_return
 from frappe.model.document import Document
 from erpnext.accounts.utils import get_fiscal_year
 from india_compliance.gst_india.api_classes.public import PublicAPI
@@ -25,10 +22,11 @@ class GSTReturnStatus(Document):
                 frappe.throw('Selected FY {} is before the GST Era'.format(tup[0]))
             elif tup[1] > today.date():
                 frappe.throw('Selected FY {} has not Even Started'.format(tup[0]))
-    
+
         api = PublicAPI()
-        response = api.get_returns_info(self.gstin, self.fiscal_year)
-    
+        fy = format_gst_fy(self.fiscal_year)
+        response = api.get_returns_info(self.gstin, fy)
+
         efiled_list = response.get("EFiledlist") or response.get("data")
         if efiled_list:
             self.json_reply = str(efiled_list)
@@ -44,3 +42,10 @@ class GSTReturnStatus(Document):
                 temp_dict['arn_number'] = d.get('arn')
                 temp_dict['status'] = d.get('status')
                 self.append("returns", temp_dict.copy())
+
+def format_gst_fy(fy: str) -> str:
+    """Convert ERPNext fiscal year like '20xx-20xx' to GST format '20xx-xx'."""
+    if "-" in fy and len(fy) == 9:  # 'YYYY-YYYY'
+        start, end = fy.split("-")
+        return f"{start}-{end[-2:]}"
+    return fy
