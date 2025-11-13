@@ -4,7 +4,7 @@
 from __future__ import unicode_literals
 import frappe
 from datetime import date
-from erpnext.regional.report.gstr_1.gstr_1 import Gstr1Report
+from rohit_common.rohit_common.report.rigpl_legacy_gstr1.rigpl_legacy_gstr1 import Gstr1Report
 
 def execute(filters=None):
 	return ClearTaxImport(filters).run()
