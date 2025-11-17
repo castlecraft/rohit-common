@@ -14,9 +14,9 @@ frappe.frappe.core.doctype.file.file.has_permission=has_permission
 frappe.frappe.core.doctype.file.file.get_permission_query_conditions=get_permission_query_conditions
 
 
-# import frappe.contacts.doctype.contact.contact as original_contact_module
-# from rohit_common.core.contact import contact_query as custom_contact_query
-# original_contact_module.contact_query = custom_contact_query
+import frappe.contacts.doctype.contact.contact as original_contact_module
+from rohit_common.core.contact import custom_contact_query
+original_contact_module.contact_query = custom_contact_query
 
 
 # Override for EInvoiceData.get_data

@@ -287,3 +287,5 @@ def execute(company, company_gstin, dry_run=True, default_sales_account=None):
 #     'dry_run': False \
 #   }"
 
+# before running enable all fiscal year and acc_frozen_upto from account settings
+# manually cancel all period closing voucher and after completing the script submit them again

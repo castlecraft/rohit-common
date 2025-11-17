@@ -3,7 +3,7 @@ import frappe
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
-def contact_query(doctype, txt, searchfield, start, page_len, filters):
+def custom_contact_query(doctype, txt, searchfield, start, page_len, filters):
 	from frappe.desk.reportview import get_match_cond
 
 	doctype = "Contact"

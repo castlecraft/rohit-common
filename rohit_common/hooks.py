@@ -39,7 +39,7 @@ override_whitelisted_methods = {  # Below mentod would also take into account th
     # mentioned in the Customize form view
     # "frappe.core.doctype.file.file.get_files_by_search_text": "rohit_common.core.file.get_files_by_search_text",
     "frappe.core.api.file.get_files_by_search_text": "rohit_common.core.file.get_files_by_search_text",
-    # "frappe.contacts.doctype.contact.contact.contact_query":"rohit_common.core.contact.contact_query"
+    # "frappe.contacts.doctype.contact.contact.contact_query":"rohit_common.core.contact.custom_contact_query"
 }
 
 # Includes in <head>
