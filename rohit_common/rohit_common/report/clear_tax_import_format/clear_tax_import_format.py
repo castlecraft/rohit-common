@@ -65,8 +65,13 @@ class ClearTaxImport(Gstr1Report):
             """
 
     def get_data(self):
+        # Use self.invoice_items_details if available (from fixed parent), otherwise fallback
+        items_source = getattr(self, "invoice_items_details", None)
+        if not items_source and hasattr(self, "invoices"):
+             items_source = {}
+
         for inv_name, invoice_details in self.invoices.items():
-            items = self.invoice_items_details.get(inv_name, [])
+            items = items_source.get(inv_name, [])
             
             # Group items by rate
             items_by_rate = {}
@@ -74,23 +79,15 @@ class ClearTaxImport(Gstr1Report):
                 rate = flt(item.igst_rate) + flt(item.cgst_rate) + flt(item.sgst_rate)
                 items_by_rate.setdefault(rate, []).append(item)
             
-            # Check if this invoice has ANY taxable items (rate > 0)
-            has_taxable_items = any(r > 0 for r in items_by_rate.keys())
-
             for rate, rate_items in items_by_rate.items():
-                # --- FILTER: Duplicate Row Prevention ---
-                # If this invoice has taxable items (rate > 0), DO NOT show the 0-rate row.
-                # This hides the duplicate "0 tax" row for normal invoices.
-                if rate == 0 and has_taxable_items:
-                     # Exception: If it's an export invoice, we might want to show 0-rate rows
-                     # But usually, for mixed invoices, we only want the taxable line.
-                     continue
-                # ----------------------------------------
-
                 row, taxable_value = self.get_row_data_for_invoice(inv_name, invoice_details, rate, rate_items)
                 
+                # --- FILTER: Remove rows with no value ---
+                # This is the ONLY filter we need. It removes true duplicates/empty rows.
+                # We DO NOT filter by rate==0 , so valid 0% items will show.
                 if taxable_value <= 0:
                     continue
+                # -----------------------------------------
 
                 igst_paid = 0
                 cgst_paid = 0
@@ -133,7 +130,8 @@ class ClearTaxImport(Gstr1Report):
                 self.data.append(row)
     
     def is_igst_invoice(self, inv_name):
-        return inv_name in self.igst_invoices
+        # Check if invoice is in the IGST list (populated by parent)
+        return hasattr(self, "igst_invoices") and inv_name in self.igst_invoices
 
     def get_columns(self):
         tax_val_col = { "fieldname": "taxable_value", "label": "Taxable Value", "fieldtype": "Currency", "width": 100 }
