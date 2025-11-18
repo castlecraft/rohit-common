@@ -1,4 +1,3 @@
-# rohit_common/utils/fix_purchase_invoices_gst.py
 import frappe
 import csv
 import os
@@ -544,8 +543,8 @@ def execute(dry_run=True, batch_size=200, limit=None, sum_tolerance=SUM_TOLERANC
     return {"part1_summary": summary1, "part2_summary": summary2}
 
 
-# bench --site development.localhost execute rohit_common.utils.fix_purchase_invoices_gst.execute \
+# bench --site development.localhost execute rohit_common.migration_scripts.fix_purchase_invoices_gst.execute \
 #   --kwargs "{'dry_run': True, 'limit': 100}"
 
-# bench --site development.localhost execute rohit_common.utils.fix_purchase_invoices_gst.execute \
+# bench --site development.localhost execute rohit_common.migration_scripts.fix_purchase_invoices_gst.execute \
 #   --kwargs "{'dry_run': False}"

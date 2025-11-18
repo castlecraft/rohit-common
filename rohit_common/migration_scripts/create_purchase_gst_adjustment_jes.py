@@ -1,11 +1,9 @@
-# rohit_common/utils/create_purchase_gst_adjustment_jes.py
 import frappe
 import json
 from frappe.utils import flt, nowdate, get_last_day, getdate
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
-# --- V2 FIX: Import functions from the correct location for your version ---
 try:
     from frappe.query_builder.functions import Sum, Date
 except ImportError:
@@ -266,7 +264,6 @@ def execute(company, company_gstin, dry_run=True, default_expense_account=None):
 
         correct_totals = _get_correct_purchase_totals(period_start, period_end)
         
-        # --- V2 FIX: Use dates instead of month/year string ---
         wrong_totals = _get_gl_input_totals(company, company_gstin, period_start, period_end)
         
         if not correct_totals and (not wrong_totals or sum(wrong_totals.values()) == 0):
@@ -296,14 +293,14 @@ def execute(company, company_gstin, dry_run=True, default_expense_account=None):
     print("\n--- SCRIPT FINISHED ---")
 
 
-# bench --site development.localhost execute rohit_common.utils.create_purchase_gst_adjustment_jes.execute \
+# bench --site development.localhost execute rohit_common.migration_scripts.create_purchase_gst_adjustment_jes.execute \
 #   --kwargs "{ \
 #     'company': 'Rohit Industries Group Private Ltd', \
 #     'company_gstin': '06AAACR1567J1ZC', \
 #     'dry_run': True \
 #   }"
 
-# bench --site development.localhost execute rohit_common.utils.create_purchase_gst_adjustment_jes.execute \
+# bench --site development.localhost execute rohit_common.migration_scripts.create_purchase_gst_adjustment_jes.execute \
 #   --kwargs "{ \
 #     'company': 'Rohit Industries Group Private Ltd', \
 #     'company_gstin': '06AAACR1567J1ZC', \

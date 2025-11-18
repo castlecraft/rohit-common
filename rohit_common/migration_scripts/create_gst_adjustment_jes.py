@@ -1,7 +1,7 @@
 # rohit_common/utils/create_gst_adjustment_jes.py
 import frappe
 import json
-from frappe.utils import flt, nowdate, get_last_day, getdate # <-- Added getdate
+from frappe.utils import flt, nowdate, get_last_day, getdate 
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
@@ -219,7 +219,6 @@ def execute(company, company_gstin, dry_run=True, default_sales_account=None):
     # --- Loop through all periods ---
     start_date = datetime.strptime(GST_START_DATE, "%Y-%m-%d").date()
     
-    # *** THIS IS THE FIX ***
     end_date = getdate(nowdate()) # Convert string from nowdate() to a date object
     
     current_date = start_date
@@ -272,7 +271,7 @@ def execute(company, company_gstin, dry_run=True, default_sales_account=None):
         
     print("\n--- SCRIPT FINISHED ---")
 
-# bench --site development.localhost execute rohit_common.utils.create_gst_adjustment_jes.execute \
+# bench --site development.localhost execute rohit_common.migration_scripts.create_gst_adjustment_jes.execute \
 #   --kwargs "{ \
 #     'company': 'Rohit Industries Group Private Ltd', \
 #     'company_gstin': '06AAACR1567J1ZC', \
@@ -280,7 +279,7 @@ def execute(company, company_gstin, dry_run=True, default_sales_account=None):
 #   }"
 
 
-# bench --site development.localhost execute rohit_common.utils.create_gst_adjustment_jes.execute \
+# bench --site development.localhost execute rohit_common.migration_scripts.create_gst_adjustment_jes.execute \
 #   --kwargs "{ \
 #     'company': 'Rohit Industries Group Private Ltd', \
 #     'company_gstin': '06AAACR1567J1ZC', \

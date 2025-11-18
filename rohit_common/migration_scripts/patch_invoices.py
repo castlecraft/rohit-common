@@ -1,4 +1,3 @@
-# rohit_common/utils/patch_invoices.py
 import frappe
 
 def run_patch(dry_run=True):
@@ -157,5 +156,5 @@ def execute(dry_run=True, batch_size=200):
     is_dry_run = bool(dry_run)
     return run_patch(dry_run=is_dry_run)
 
-# bench --site development.localhost execute rohit_common.utils.patch_invoices.execute --kwargs "{'dry_run': True}"
-# bench --site development.localhost execute rohit_common.utils.patch_invoices.execute --kwargs "{'dry_run': False}"
+# bench --site development.localhost execute rohit_common.migration_scripts.patch_invoices.execute --kwargs "{'dry_run': True}"
+# bench --site development.localhost execute rohit_common.migration_scripts.patch_invoices.execute --kwargs "{'dry_run': False}"

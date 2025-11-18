@@ -1,4 +1,3 @@
-# rohit_common/utils/combined_gst_fix.py
 import frappe
 import csv
 import os
@@ -14,7 +13,6 @@ GST_START_DATE = "2017-07-01"
 
 # ====================================================================
 # === PART 1: FILL 'gst_tax_type' IN SALES TAXES AND CHARGES
-# (Using your original, more robust logic)
 # ====================================================================
 
 def _first_two_gstin_digits(gstin: Optional[str]) -> Optional[str]:

@@ -1,4 +1,3 @@
-# rohit_common/utils/repopulate_company_gstin.py
 import frappe
 
 def repopulate_sales_invoice_company_gstin(dry_run=True, batch_size=200, limit=None):
@@ -142,7 +141,7 @@ def execute(dry_run=True, batch_size=200, limit=None):
     return repopulate_sales_invoice_company_gstin(dry_run=dry_run, batch_size=batch_size, limit=limit)
 
 # dry run - prints actions, does not write
-# bench --site development.localhost execute rohit_common.utils.repopulate_company_gstin.execute --kwargs "{'dry_run': True, 'limit': 100}"
+# bench --site development.localhost execute rohit_common.migration_scripts.repopulate_company_gstin.execute --kwargs "{'dry_run': True, 'limit': 100}"
 
 # when happy, perform actual update (no limit):
-# bench --site development.localhost execute rohit_common.utils.repopulate_company_gstin.execute --kwargs "{'dry_run': False, 'batch_size': 200}"
+# bench --site development.localhost execute rohit_common.migration_scripts.repopulate_company_gstin.execute --kwargs "{'dry_run': False, 'batch_size': 200}"
