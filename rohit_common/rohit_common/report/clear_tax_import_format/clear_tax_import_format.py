@@ -399,7 +399,7 @@ class ClearTaxImport(Gstr1Report):
             select {select_columns} from `tab{doctype}`
             where docstatus = 1 {where_conditions} and is_opening = 'No'
             order by posting_date desc
-        """.format(
+            """.format(
                 select_columns=self.select_columns,
                 doctype=self.doctype,
                 where_conditions=conditions,
