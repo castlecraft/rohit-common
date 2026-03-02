@@ -100,13 +100,6 @@ doctype_js = {
     "Contact": "public/js/contact.js",
     "Sales Taxes and Charges Template": "public/js/stct.js",
     "Sales Invoice": "public/js/transaction_override.js",
-    # "Purchase Invoice": "public/js/transaction_override.js",
-    # "Sales Order": "public/js/transaction_override.js",
-    # "Purchase Order": "public/js/transaction_override.js",
-    # "Quotation": "public/js/transaction_override.js",
-    # "Delivery Note": "public/js/transaction_override.js",
-    # "Purchase Receipt": "public/js/transaction_override.js",
-    # "POS Invoice": "public/js/transaction_override.js",
 }
 
 # Document Events
