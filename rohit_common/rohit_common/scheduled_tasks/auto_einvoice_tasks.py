@@ -26,41 +26,62 @@ def enq_einv_create():
 
 def get_unposted_invoices():
     """
-    Gets invoices that were submitted but GL entries were not created
+    Finds submitted invoices without GL entries and resets them to Draft.
     """
+    log = frappe.logger("gl_repair")
+    
+    BATCH_SIZE = 20
 
     invoices = frappe.db.sql(
         """
         SELECT si.name
         FROM `tabSales Invoice` si
+        LEFT JOIN `tabGL Entry` gle
+            ON gle.voucher_no = si.name
+            AND gle.voucher_type = 'Sales Invoice'
         WHERE si.base_grand_total > 0
         AND si.docstatus = 1
-        AND si.name NOT IN (
-            SELECT gle.voucher_no
-            FROM `tabGL Entry` gle
-            WHERE gle.voucher_type = 'Sales Invoice'
-            AND gle.voucher_no = si.name
-        )
+        AND gle.name IS NULL
         ORDER BY si.creation
         """,
         as_dict=True
     )
 
+    processed = 0
+
     for row in invoices:
 
-        doc = frappe.get_doc("Sales Invoice", row.name)
+        try:
+            doc = frappe.get_doc("Sales Invoice", row.name)
 
-        doc.cancel()
+            doc.cancel()
 
-        frappe.db.set_value("Sales Invoice", row.name, {
-            "docstatus": 0,
-            "set_posting_time": 1,
-            "marked_to_submit": 1
-        })
+            frappe.db.set_value(
+                "Sales Invoice",
+                row.name,
+                {
+                    "docstatus": 0,
+                    "set_posting_time": 1,
+                    "marked_to_submit": 1
+                }
+            )
 
-        frappe.logger().info(
-            f"Sales Invoice {row.name} not posted in GL. Converted back to Draft."
-        )
+            log.info(
+                f"Sales Invoice {row.name} not posted in GL. Converted back to Draft."
+            )
+
+            processed += 1
+
+        except Exception:
+            frappe.log_error(
+                frappe.get_traceback(),
+                f"GL repair failed for Sales Invoice {row.name}"
+            )
+
+        if processed and processed % BATCH_SIZE == 0:
+            frappe.db.commit()
+
+    frappe.db.commit()
 
 
 def get_docs_to_submit():
