@@ -177,26 +177,66 @@ def execute():
 
 
 def check_correct_folders():
-    st_time = time.time()
+    log = frappe.logger("file_cleanup")
+    start = time.time()
+
     rebuild_tree(doctype="File", parent_field="folder", group_field="is_folder")
     frappe.db.commit()
-    tr_time = time.time()
-    folders = frappe.db.sql("""SELECT name, folder, file_size, lft, rgt, important_document_for_archive
-        FROM `tabFile` WHERE is_folder=1 ORDER BY lft DESC, rgt DESC""", as_dict=1)
+
+    rebuild_time = time.time()
+
+    folders = frappe.db.sql("""
+        SELECT name, folder, file_size, important_document_for_archive
+        FROM `tabFile`
+        WHERE is_folder = 1
+    """, as_dict=True)
+
+    # fetch folder sizes in one query
+    folder_sizes = frappe.db.sql("""
+        SELECT folder, SUM(file_size) AS size
+        FROM `tabFile`
+        WHERE folder IS NOT NULL
+        GROUP BY folder
+    """, as_dict=True)
+
+    size_map = {f.folder: f.size for f in folder_sizes}
+
+    # fetch parent flags once
+    parent_flags = frappe.db.sql("""
+        SELECT name, important_document_for_archive
+        FROM `tabFile`
+        WHERE is_folder = 1
+    """, as_dict=True)
+
+    parent_map = {p.name: p.important_document_for_archive for p in parent_flags}
+
     for fd in folders:
+
+        fd_size = size_map.get(fd.name, 0)
+
+        # inherit archive flag
         if fd.folder:
-            pfd = frappe.get_doc("File", fd.folder)
-            if pfd.important_document_for_archive == 1:
-                if fd.important_document_for_archive != 1:
-                    frappe.db.set_value("File", fd.name, "important_document_for_archive", pfd.important_document_for_archive)
-            fd_file_size = frappe.db.sql("""SELECT DISTINCT file_name, file_size, folder
-                FROM `tabFile` WHERE folder = '%s'""" % fd.name, as_dict=1)
-            fd_size = 0
-            if fd_file_size:
-                for fl in fd_file_size:
-                    fd_size += fl.file_size
+            parent_flag = parent_map.get(fd.folder)
+
+            if parent_flag == 1 and fd.important_document_for_archive != 1:
+                frappe.db.set_value(
+                    "File",
+                    fd.name,
+                    "important_document_for_archive",
+                    1
+                )
+
         if fd_size != fd.file_size:
-            frappe.db.set_value("File", fd.name, "file_size", fd_size)
-            print(f"Updating Folder: {fd.name} with Actual File Size = {fd_file_size[0].size} old size {fd.file_size}")
-    print(f"Time Taken for Tree Rebuild = {int(tr_time - st_time)} seconds")
-    print(f"Total Time Taken For Tree Build and File Size Checking = {int(time.time() - st_time)} seconds")
+            frappe.db.set_value(
+                "File",
+                fd.name,
+                "file_size",
+                fd_size
+            )
+
+            log.info(
+                f"Updating Folder {fd.name} size {fd.file_size} → {fd_size}"
+            )
+
+    log.info(f"Tree rebuild time = {int(rebuild_time - start)}s")
+    log.info(f"Total runtime = {int(time.time() - start)}s")
